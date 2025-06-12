@@ -1,0 +1,10 @@
+streamlit
+streamlit-authenticator
+pyyaml
+pandas
+numpy
+plotly
+scikit-learn
+xgboost
+statsmodels
+joblib
