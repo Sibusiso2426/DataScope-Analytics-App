@@ -135,4 +135,107 @@ Model Loading: Load previously saved models, restoring their state and displayin
 
 Prediction Interface: Use the trained or loaded model to make predictions on new, user-inputted data, with appropriate transformations applied.
 
+### 📊 Advanced Statistical Analysis
+Dive deeper into your data with advanced statistical methods:
+
+Data Distribution & Statistics: View descriptive statistics and histograms for numerical columns.
+
+Correlation Analysis: Visualize the correlation matrix between numerical features using a heatmap.
+
+Grouped Statistics: Compute aggregate statistics (mean, median, sum, count, std) for numerical columns, grouped by categorical variables.
+
+Hypothesis Testing (Two-sample T-test): Perform a two-sample T-test to compare means between two groups for a selected numerical column.
+
+Principal Component Analysis (PCA): Reduce dimensionality of numerical data, visualize explained variance, and plot transformed components.
+
+K-Means Clustering: Perform unsupervised clustering on numerical data, visualize cluster assignments, and utilize the Elbow Method to help determine the optimal number of clusters.
+
+Dimensionality Reduction & Visualization (t-SNE): Apply t-SNE for non-linear dimensionality reduction and visualize high-dimensional data in 2D or 3D.
+
+### 📈 Business Intelligence & Financial Analytics
+Gain deeper insights and specialized financial analysis capabilities:
+
+Advanced Reporting:
+
+Automated report generation
+
+Executive dashboards and KPI monitoring
+
+Scheduled report delivery
+
+Custom report templates
+
+Interactive storytelling with data
+
+Financial Analytics:
+
+Risk modeling and portfolio optimization
+
+Time series forecasting for financial data
+
+Monte Carlo simulations
+
+Financial metrics calculation.
+
+### 🛠️ Technologies Used
+Streamlit: For building the interactive web application and user interface.
+
+Pandas: For data manipulation and analysis.
+
+NumPy: For numerical operations.
+
+Plotly Express & Plotly Graph Objects: For creating interactive and visually appealing data visualizations.
+
+Scikit-learn: For various machine learning algorithms (Linear Regression, Logistic Regression, Random Forest, PCA, KMeans, TSNE) and preprocessing (StandardScaler, LabelEncoder).
+
+XGBoost: For gradient boosting models.
+
+Statsmodels: For Time Series Forecasting (ARIMA).
+
+Joblib: For efficient saving and loading of Python objects (trained models, scalers, encoders).
+
+SQLite3: For user authentication database management.
+
+Hashlib: For secure password hashing.
+
+PyYAML: For configuration management (though currently not heavily utilized, can be expanded for app settings).
+
+### 🚀 Getting Started
+To run this application locally:
+
+Clone the repository (if applicable, otherwise copy the code into a .py file).
+
+Install dependencies:
+
+     pip install streamlit streamlit-authenticator pyyaml pandas numpy plotly scikit-learn xgboost statsmodels joblib
+
+Run the Streamlit app:
+
+     streamlit run your_app_file_name.py
+
+(Replace your_app_file_name.py with the actual name of your Python script.)
+
+The application will open in your default web browser.
+
+### 💡 Usage
+Register a new account or Login with existing credentials.
+
+Navigate through the sidebar to access different modules:
+
+Data Upload: Upload your dataset or connect to an SQLite database.
+
+Data Cleaning: Apply various preprocessing steps.
+
+Dashboard Builder: Create interactive charts.
+
+Model Builder: Train ML models, save/load them, and make predictions.
+
+Advanced Analytics: Perform deeper statistical and unsupervised learning analyses.
+
+### 🤝 Contributing
+(Optional section for future development)
+Contributions are welcome! If you have suggestions for improvements or new features, please feel free to open an issue or submit a pull request.
+
+### DataScope Analytics - Empowering your data journey.
+
 
