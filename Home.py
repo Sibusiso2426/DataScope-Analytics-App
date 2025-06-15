@@ -31,12 +31,14 @@ import re
 from datetime import datetime, timedelta
 import secrets
 import joblib # New import for saving/loading models
+import requests # New import for API calls
+import json # New import for JSON handling
 
 # New import for Time Series Forecasting
 from statsmodels.tsa.arima.model import ARIMA
 # Suppress specific warnings from statsmodels
 warnings.filterwarnings("ignore", message="No supported index is available. Prediction results will be given with default index", category=UserWarning)
-warnings.filterwarnings("ignore", message="A date index must be provided for the predict method", category=UserWarning)
+warnings.warn("A date index must be provided for the predict method", UserWarning) # Corrected syntax for warnings.warn
 
 
 # Ensure the directory for saved models exists
@@ -422,7 +424,7 @@ def datascope_app_content():
             """)
             
             features = [
-                "📤 **Data Upload**: Support for CSV, Excel, JSON, and SQLite databases",
+                "📤 **Data Upload**: Support for CSV, Excel, JSON, SQLite, and **API data fetching**", # Updated feature list
                 "🧹 **Data Cleaning**: Handle missing values, duplicates, outliers, and advanced feature engineering",
                 "📈 **Dashboard Builder**: Create interactive visualizations with Plotly, including new chart types like Choropleth Maps and Violin Plots",
                 "🤖 **Model Builder**: Build and evaluate ML models (Linear, Logistic, Random Forest, XGBoost) with hyperparameter tuning and a prediction interface",
@@ -467,7 +469,7 @@ def datascope_app_content():
     elif page == "📤 Data Upload":
         st.markdown('<h2 class="section-header">📤 Data Upload & Preview</h2>', unsafe_allow_html=True)
         
-        tab_files, tab_db = st.tabs(["Upload Files", "Connect to SQLite Database"])
+        tab_files, tab_db, tab_api = st.tabs(["Upload Files", "Connect to SQLite Database", "Fetch from API"])
 
         with tab_files:
             # File upload
@@ -487,7 +489,6 @@ def datascope_app_content():
                     elif uploaded_file.name.endswith('.json'):
                         df = pd.read_json(uploaded_file)
                     
-                    # --- START OF NEW/MODIFIED CODE ---
                     # Proactively attempt to convert object columns to datetime
                     for col in df.select_dtypes(include='object').columns:
                         try:
@@ -503,7 +504,6 @@ def datascope_app_content():
                         except Exception:
                             # Ignore columns that cannot be converted to datetime
                             pass
-                    # --- END OF NEW/MODIFIED CODE ---
 
                     st.session_state.data = df
                     st.session_state.cleaned_data = df.copy()
@@ -572,7 +572,6 @@ def datascope_app_content():
                         df = pd.read_sql_query(f"SELECT * FROM {selected_table}", conn)
                         conn.close()
 
-                        # --- START OF NEW/MODIFIED CODE ---
                         # Proactively attempt to convert object columns to datetime for DB data too
                         for col in df.select_dtypes(include='object').columns:
                             try:
@@ -582,7 +581,6 @@ def datascope_app_content():
                                     st.info(f"Column '{col}' successfully converted to datetime.")
                             except Exception:
                                 pass
-                        # --- END OF NEW/MODIFIED CODE ---
 
                         st.session_state.data = df
                         st.session_state.cleaned_data = df.copy()
@@ -590,6 +588,86 @@ def datascope_app_content():
                         st.dataframe(df.head(10), use_container_width=True)
                     except Exception as e:
                         st.error(f"❌ Error loading data from table: {str(e)}")
+        
+        with tab_api:
+            st.markdown("### Fetch Data from API (JSON)")
+            api_url = st.text_input("Enter API URL (e.g., https://api.exchangerate-api.com/v4/latest/USD)")
+            api_headers_str = st.text_area("Optional: Enter Headers as JSON (e.g., {'Authorization': 'Bearer YOUR_TOKEN'})", "{}")
+            
+            if st.button("Fetch Data from API"):
+                if api_url:
+                    try:
+                        headers = json.loads(api_headers_str) if api_headers_str else {}
+                        
+                        st.info(f"Fetching data from {api_url}...")
+                        response = requests.get(api_url, headers=headers)
+                        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+                        
+                        json_data = response.json()
+                        
+                        # Attempt to flatten JSON data to DataFrame
+                        try:
+                            # Try to normalize if it's a list of dicts or nested dicts
+                            df = pd.json_normalize(json_data)
+                        except Exception as e:
+                            st.warning(f"Could not automatically flatten JSON. Attempting direct DataFrame conversion. Error: {e}")
+                            # If json_normalize fails, try direct conversion (e.g., if it's a flat dict)
+                            df = pd.DataFrame([json_data])
+                        
+                        if df.empty:
+                            st.warning("API returned empty data or could not be converted to DataFrame.")
+                            st.stop()
+
+                        # Proactively attempt to convert object columns to datetime
+                        for col in df.select_dtypes(include='object').columns:
+                            try:
+                                temp_series = pd.to_datetime(df[col], errors='coerce')
+                                if temp_series.count() > 0 and (temp_series.count() / len(temp_series) > 0.5 or temp_series.isnull().sum() == 0):
+                                    df[col] = temp_series
+                                    st.info(f"Column '{col}' successfully converted to datetime.")
+                            except Exception:
+                                pass
+
+                        st.session_state.data = df
+                        st.session_state.cleaned_data = df.copy()
+                        
+                        st.success(f"✅ Data fetched from API successfully! Shape: {df.shape}")
+                        
+                        # Display basic info
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Rows", df.shape[0])
+                        with col2:
+                            st.metric("Columns", df.shape[1])
+                        with col3:
+                            st.metric("Missing Values", df.isnull().sum().sum())
+                        with col4:
+                            st.metric("Duplicates", df.duplicated().sum())
+                        
+                        # Preview data
+                        st.markdown("### 👀 Data Preview")
+                        st.dataframe(df.head(10), use_container_width=True)
+                        
+                        # Column information
+                        st.markdown("### 📋 Column Information")
+                        col_info = pd.DataFrame({
+                            'Column': df.columns,
+                            'Data Type': df.dtypes,
+                            'Non-Null Count': df.count(),
+                            'Null Count': df.isnull().sum(),
+                            'Unique Values': df.nunique()
+                        })
+                        st.dataframe(col_info, use_container_width=True)
+
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"❌ Network or API request error: {str(e)}")
+                    except json.JSONDecodeError:
+                        st.error("❌ API response is not a valid JSON. Please check the URL.")
+                    except Exception as e:
+                        st.error(f"❌ An unexpected error occurred: {str(e)}")
+                else:
+                    st.warning("Please enter an API URL.")
+
 
     # DATA CLEANING PAGE
     elif page == "🧹 Data Cleaning":
@@ -2122,17 +2200,17 @@ def main_app():
 # Main application flow
 def main():
     """Main application entry point"""
-    # Initialize database and session state
-    init_database()
-    init_session_state() # This now initializes all session state variables
-    
-    # Configure page
+    # Configure page - MUST BE THE FIRST STREAMLIT COMMAND
     st.set_page_config(
         page_title="DataScope Analytics App",
         page_icon="🔐",
         layout="wide",
         initial_sidebar_state="auto"
     )
+
+    # Initialize database and session state
+    init_database()
+    init_session_state() # This now initializes all session state variables
     
     # Custom CSS for better styling
     st.markdown("""
