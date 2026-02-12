@@ -395,6 +395,18 @@ def detect_column_types(df):
     
     return numeric_cols, categorical_cols, datetime_cols
 
+# New function to create KPI cards
+def create_kpi_card(label, value, delta=None, delta_color="normal"):
+    """
+    Creates a streamlit metric card (KPI card) in an elegant way.
+    The delta parameter is optional and can be used to show change from a previous period.
+    """
+    # Use st.metric for the standard KPI look
+    if delta is not None:
+        st.metric(label=label, value=value, delta=delta, delta_color=delta_color)
+    else:
+        st.metric(label=label, value=value)
+
 
 def datascope_app_content():
     """All the content for the DataScope Analytics application"""
@@ -861,173 +873,274 @@ def datascope_app_content():
         else:
             st.warning("⚠️ Please upload data first!")
 
-    # DASHBOARD BUILDER PAGE
+# DASHBOARD BUILDER PAGE
     elif page == "📈 Dashboard Builder":
         st.markdown('<h2 class="section-header">📈 Interactive Dashboard Builder</h2>', unsafe_allow_html=True)
         
         if st.session_state.data is not None:
             df = st.session_state.cleaned_data if st.session_state.cleaned_data is not None else st.session_state.data
-            
-            # Get column types
             numeric_cols, categorical_cols, datetime_cols = detect_column_types(df)
-            
-            # Dashboard configuration
-            st.markdown("### ⚙️ Dashboard Configuration")
-            
-            # Chart selection
-            chart_type = st.selectbox(
-                "Select chart type:",
-                ["Scatter Plot", "Line Chart", "Bar Chart", "Histogram", "Box Plot", "Violin Plot", "Heatmap", "Pie Chart", "Choropleth Map"]
-            )
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if chart_type in ["Scatter Plot", "Line Chart"]:
-                    x_axis = st.selectbox("X-axis:", numeric_cols + categorical_cols + datetime_cols)
-                    y_axis = st.selectbox("Y-axis:", numeric_cols)
-                    color_by = st.selectbox("Color by (optional):", ["None"] + categorical_cols)
-                    
-                elif chart_type in ["Bar Chart"]:
-                    x_axis = st.selectbox("Category:", categorical_cols)
-                    y_axis = st.selectbox("Value:", numeric_cols)
-                    
-                elif chart_type == "Histogram":
-                    x_axis = st.selectbox("Column:", numeric_cols)
-                    bins = st.slider("Number of bins:", 10, 100, 30)
-                    
-                elif chart_type in ["Box Plot", "Violin Plot"]:
-                    y_axis = st.selectbox("Value column:", numeric_cols)
-                    x_axis = st.selectbox("Group by (optional):", ["None"] + categorical_cols)
-                    
-                elif chart_type == "Heatmap":
-                    st.info("Correlation heatmap will be generated for numeric columns")
-                    
-                elif chart_type == "Pie Chart":
-                    category_col = st.selectbox("Category column:", categorical_cols)
 
-                elif chart_type == "Choropleth Map":
-                    if categorical_cols and numeric_cols:
-                        location_col = st.selectbox("Location Column (e.g., Country Name/Code):", categorical_cols)
-                        value_col = st.selectbox("Value Column:", numeric_cols)
-                        st.info("Ensure your location column contains country names or ISO alpha-3 codes.")
-                    else:
-                        st.warning("Need both categorical (for locations) and numeric (for values) columns for Choropleth Map.")
-                        location_col = None
-                        value_col = None
+            st.subheader("📌 Key Performance Indicators")
             
-            with col2:
-                # Chart customization
-                st.markdown("#### 🎨 Customization")
-                chart_title = st.text_input("Chart title:", f"{chart_type} Visualization")
-                chart_height = st.slider("Chart height:", 300, 800, 500)
-                color_scheme = st.selectbox("Color scheme:", ["plotly", "viridis", "plasma", "inferno", "magma", "cividis", "magma_r"])
+            # Configuration UI
+            with st.expander("Configure KPI Cards", expanded=True):
+                col_cfg1, col_cfg2 = st.columns([2, 1])
                 
-                # For Choropleth, add scope
-                if chart_type == "Choropleth Map":
-                    map_scope = st.selectbox("Map Scope:", ["world", "asia", "europe", "africa", "north america", "south america"])
+                with col_cfg1:
+                    selected_kpi_cols = st.multiselect(
+                        "Select columns to analyze:",
+                        options=numeric_cols,
+                        default=numeric_cols[0] if numeric_cols else None
+                    )
+                
+                with col_cfg2:
+                    agg_type = st.radio(
+                        "Select Aggregation:",
+                        ["Sum", "Average", "Maximum"],
+                        horizontal=True
+                    )
 
+            # Display KPIs
+            if selected_kpi_cols:
+                # 1. Always show Total Rows first
+                st.markdown(f"#### {agg_type} Metrics Overview")
+                
+                # Create a row for the Total Rows + Selected Column Metrics
+                # We add +1 to columns for the 'Total Rows' card
+                kpi_layout = st.columns(len(selected_kpi_cols) + 1)
+                
+                # Global Row Count Card
+                with kpi_layout[0]:
+                    create_kpi_card("Total Rows", f"{len(df):,}")
 
-            # Generate chart
-            if st.button("📊 Generate Chart"):
-                try:
-                    fig = None
-                    
-                    if chart_type == "Scatter Plot":
-                        color = None if color_by == "None" else color_by
-                        fig = px.scatter(df, x=x_axis, y=y_axis, color=color, 
-                                         title=chart_title, height=chart_height, color_continuous_scale=color_scheme)
-                    
-                    elif chart_type == "Line Chart":
-                        color = None if color_by == "None" else color_by
-                        fig = px.line(df, x=x_axis, y=y_axis, color=color,
-                                     title=chart_title, height=chart_height)
-                    
-                    elif chart_type == "Bar Chart":
-                        df_grouped = df.groupby(x_axis)[y_axis].mean().reset_index()
-                        fig = px.bar(df_grouped, x=x_axis, y=y_axis,
-                                     title=chart_title, height=chart_height, color_discrete_sequence=px.colors.qualitative.Set3)
-                    
-                    elif chart_type == "Histogram":
-                        fig = px.histogram(df, x=x_axis, nbins=bins,
-                                             title=chart_title, height=chart_height, color_discrete_sequence=px.colors.qualitative.Set3)
-                    
-                    elif chart_type == "Box Plot":
-                        x = None if x_axis == "None" else x_axis
-                        fig = px.box(df, x=x, y=y_axis,
-                                     title=chart_title, height=chart_height)
-
-                    elif chart_type == "Violin Plot":
-                        x = None if x_axis == "None" else x_axis
-                        fig = px.violin(df, x=x, y=y_axis,
-                                        title=chart_title, height=chart_height)
-                    
-                    elif chart_type == "Heatmap":
-                        corr_matrix = df[numeric_cols].corr()
-                        fig = px.imshow(corr_matrix, text_auto=True, aspect="auto",
-                                         title=chart_title, height=chart_height, color_continuous_scale=color_scheme)
-                    
-                    elif chart_type == "Pie Chart":
-                        value_counts = df[category_col].value_counts()
-                        fig = px.pie(values=value_counts.values, names=value_counts.index,
-                                     title=chart_title, height=chart_height)
-
-                    elif chart_type == "Choropleth Map":
-                        if location_col and value_col:
-                            fig = px.choropleth(df, locations=location_col, color=value_col, 
-                                                hover_name=location_col, color_continuous_scale=color_scheme,
-                                                title=chart_title, height=chart_height, scope=map_scope)
+                # Dynamic Column Cards
+                for i, col_name in enumerate(selected_kpi_cols):
+                    with kpi_layout[i + 1]:
+                        if agg_type == "Sum":
+                            val = df[col_name].sum()
+                            label = f"Total {col_name}"
+                        elif agg_type == "Average":
+                            val = df[col_name].mean()
+                            label = f"Avg {col_name}"
+                        else: # Maximum
+                            val = df[col_name].max()
+                            label = f"Max {col_name}"
+                        
+                        # Formatting for readability
+                        if val >= 1_000_000:
+                            fmt_val = f"{val/1_000_000:.2f}M"
+                        elif val >= 1_000:
+                            fmt_val = f"{val/1_000:.1f}K"
                         else:
-                            st.warning("Please select valid location and value columns for Choropleth Map.")
-                            fig = None
+                            fmt_val = f"{val:,.2f}"
+                            
+                        create_kpi_card(label, fmt_val)
+            else:
+                # If no columns selected, still show the Row Count
+                st.info("Select columns above to see specific totals. Currently displaying global count:")
+                create_kpi_card("Total Rows", f"{len(df):,}")
+
+            st.divider()
+            # --- End of KPI Cards Section ---
+            
+            tab_scatter, tab_bar, tab_hist, tab_line, tab_box_violin, tab_other = st.tabs([
+                "Scatter Plot", "Bar Chart", "Histogram", "Line Chart", "Box/Violin Plot", "Other Charts"
+            ])
+
+            # ... (Existing chart building logic follows) ...
+            
+            with tab_scatter:
+                st.subheader("Scatter Plot")
+                if len(numeric_cols) >= 2:
+                    x_axis_scat = st.selectbox("X-Axis (Scatter):", numeric_cols, key='scat_x', index=0)
+                    y_axis_scat = st.selectbox("Y-Axis (Scatter):", numeric_cols, key='scat_y', index=1 if len(numeric_cols) > 1 else 0)
+                    color_scat = st.selectbox("Color By (Scatter):", ["None"] + categorical_cols, key='scat_color')
                     
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Additional insights
-                        st.markdown("### 💡 Quick Insights")
-                        if chart_type == "Scatter Plot" and x_axis in numeric_cols and y_axis in numeric_cols:
-                            correlation = df[x_axis].corr(df[y_axis])
-                            st.write(f"📈 Correlation between {x_axis} and {y_axis}: {correlation:.3f}")
-                        
-                        elif chart_type == "Histogram":
-                            st.write(f"📊 Mean: {df[x_axis].mean():.2f}, Median: {df[x_axis].median():.2f}, Std: {df[x_axis].std():.2f}")
-                        
-                except Exception as e:
-                    st.error(f"❌ Error generating chart: {str(e)}")
-            
-            # Multi-chart dashboard
-            st.markdown("---")
-            st.markdown("### 📱 Multi-Chart Dashboard")
-            
-            if st.checkbox("Create multi-chart dashboard"):
-                col1, col2 = st.columns(2)
+                    if x_axis_scat and y_axis_scat:
+                        try:
+                            color_arg = color_scat if color_scat != "None" else None
+                            fig_scat = px.scatter(
+                                df, 
+                                x=x_axis_scat, 
+                                y=y_axis_scat, 
+                                color=color_arg, 
+                                title=f"Scatter Plot of {y_axis_scat} vs {x_axis_scat}"
+                            )
+                            st.plotly_chart(fig_scat, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error creating scatter plot: {e}")
+                    else:
+                        st.info("Select at least two numeric columns.")
+                else:
+                    st.warning("Not enough numeric columns for a scatter plot.")
+
+            with tab_bar:
+                st.subheader("Bar Chart")
+                if categorical_cols:
+                    x_axis_bar = st.selectbox("X-Axis (Categorical):", categorical_cols, key='bar_x')
+                    y_axis_bar_opts = numeric_cols + ['Count']
+                    y_axis_bar = st.selectbox("Y-Axis (Value):", y_axis_bar_opts, key='bar_y')
+                    
+                    if x_axis_bar:
+                        try:
+                            if y_axis_bar == 'Count':
+                                # Create a temporary dataframe for counts
+                                temp_df = df.groupby(x_axis_bar).size().reset_index(name='Count')
+                                fig_bar = px.bar(
+                                    temp_df, 
+                                    x=x_axis_bar, 
+                                    y='Count', 
+                                    title=f"Count of {x_axis_bar}",
+                                    text='Count'
+                                )
+                            else:
+                                # Group by categorical column and sum/mean the numeric column
+                                bar_agg = st.selectbox(f"Aggregation for {y_axis_bar}:", ['Sum', 'Mean', 'Median'], key='bar_agg')
+                                if bar_agg == 'Sum':
+                                    temp_df = df.groupby(x_axis_bar)[y_axis_bar].sum().reset_index(name=y_axis_bar + ' Sum')
+                                    y_col = y_axis_bar + ' Sum'
+                                elif bar_agg == 'Mean':
+                                    temp_df = df.groupby(x_axis_bar)[y_axis_bar].mean().reset_index(name=y_axis_bar + ' Mean')
+                                    y_col = y_axis_bar + ' Mean'
+                                else: # Median
+                                    temp_df = df.groupby(x_axis_bar)[y_axis_bar].median().reset_index(name=y_axis_bar + ' Median')
+                                    y_col = y_axis_bar + ' Median'
+                                    
+                                fig_bar = px.bar(
+                                    temp_df, 
+                                    x=x_axis_bar, 
+                                    y=y_col, 
+                                    title=f"{bar_agg} of {y_axis_bar} by {x_axis_bar}",
+                                    text=y_col
+                                )
+                                
+                            fig_bar.update_traces(texttemplate='%{text:.2s}', textposition='outside')
+                            fig_bar.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+                            st.plotly_chart(fig_bar, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error creating bar chart: {e}")
+                    else:
+                        st.info("Select a categorical column.")
+                else:
+                    st.warning("No categorical columns for a bar chart.")
+
+            with tab_hist:
+                st.subheader("Histogram")
+                if numeric_cols:
+                    col_hist = st.selectbox("Column for Histogram:", numeric_cols, key='hist_col')
+                    
+                    try:
+                        fig_hist = px.histogram(df, x=col_hist, title=f"Distribution of {col_hist}")
+                        st.plotly_chart(fig_hist, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error creating histogram: {e}")
+                else:
+                    st.warning("No numeric columns for a histogram.")
+
+            with tab_line:
+                st.subheader("Line Chart (Time Series)")
+                if datetime_cols and numeric_cols:
+                    date_col_line = st.selectbox("Date Column:", datetime_cols, key='line_date_col')
+                    value_col_line = st.selectbox("Value Column:", numeric_cols, key='line_val_col')
+                    
+                    if date_col_line and value_col_line:
+                        try:
+                            # Group by the date column (can aggregate if multiple rows per date)
+                            # For simplicity, let's just use the mean aggregation for now
+                            time_series_df = df.set_index(date_col_line).resample('D')[value_col_line].mean().dropna().reset_index()
+                            
+                            fig_line = px.line(
+                                time_series_df, 
+                                x=date_col_line, 
+                                y=value_col_line, 
+                                title=f"Time Series of {value_col_line} over {date_col_line}"
+                            )
+                            st.plotly_chart(fig_line, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error creating line chart: {e}")
+                else:
+                    st.warning("Not enough date and numeric columns for a line chart.")
+
+            with tab_box_violin:
+                st.subheader("Box and Violin Plots")
+                if numeric_cols and categorical_cols:
+                    plot_type = st.radio("Select Plot Type:", ["Box Plot", "Violin Plot"], key='box_violin_type')
+                    y_axis_box = st.selectbox("Y-Axis (Numeric):", numeric_cols, key='box_y')
+                    x_axis_box = st.selectbox("X-Axis (Category):", ["None"] + categorical_cols, key='box_x')
+                    
+                    if y_axis_box:
+                        try:
+                            x_arg = x_axis_box if x_axis_box != "None" else None
+                            if plot_type == "Box Plot":
+                                fig_box = px.box(
+                                    df, 
+                                    y=y_axis_box, 
+                                    x=x_arg, 
+                                    title=f"Box Plot of {y_axis_box} {'by ' + x_arg if x_arg else ''}"
+                                )
+                            else: # Violin Plot
+                                fig_box = px.violin(
+                                    df, 
+                                    y=y_axis_box, 
+                                    x=x_arg, 
+                                    box=True, # Add box plot inside the violin
+                                    title=f"Violin Plot of {y_axis_box} {'by ' + x_arg if x_arg else ''}"
+                                )
+                            st.plotly_chart(fig_box, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error creating {plot_type}: {e}")
+                    else:
+                        st.info("Select a numeric column for the Y-axis.")
+                else:
+                    st.warning("Need both numeric and categorical columns for these plots.")
+
+            with tab_other:
+                st.subheader("Other Advanced Visualizations")
                 
-                with col1:
-                    if len(numeric_cols) >= 2:
-                        fig1 = px.scatter(df, x=numeric_cols[0], y=numeric_cols[1], 
-                                         title=f"{numeric_cols[0]} vs {numeric_cols[1]}")
-                        st.plotly_chart(fig1, use_container_width=True)
-                    
-                    if len(categorical_cols) > 0 and len(numeric_cols) > 0:
-                        fig3 = px.box(df, x=categorical_cols[0], y=numeric_cols[0],
-                                     title=f"{numeric_cols[0]} by {categorical_cols[0]}")
-                        st.plotly_chart(fig3, use_container_width=True)
-            
-                with col2:
-                    if len(numeric_cols) > 0:
-                        fig2 = px.histogram(df, x=numeric_cols[0], 
-                                             title=f"Distribution of {numeric_cols[0]}")
-                        st.plotly_chart(fig2, use_container_width=True)
-                    
-                    if len(numeric_cols) >= 2:
+                # Correlation Heatmap
+                st.markdown("#### Correlation Heatmap")
+                if numeric_cols and len(numeric_cols) >= 2:
+                    try:
                         corr_matrix = df[numeric_cols].corr()
-                        fig4 = px.imshow(corr_matrix, text_auto=True, 
-                                         title="Correlation Heatmap")
-                        st.plotly_chart(fig4, use_container_width=True)
-        
+                        fig_corr = px.imshow(
+                            corr_matrix, 
+                            text_auto=True, 
+                            aspect="auto", 
+                            color_continuous_scale='RdBu_r', 
+                            title="Numeric Feature Correlation Heatmap"
+                        )
+                        st.plotly_chart(fig_corr, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error creating correlation heatmap: {e}")
+                else:
+                    st.info("Need at least two numeric columns for a correlation heatmap.")
+                    
+                st.markdown("---")
+
+                # Pie Chart
+                st.markdown("#### Pie Chart")
+                if categorical_cols:
+                    pie_col = st.selectbox("Column for Pie Chart (Count):", ["None"] + categorical_cols, key='pie_col')
+                    if pie_col != "None":
+                        try:
+                            fig_pie = px.pie(
+                                df, 
+                                names=pie_col, 
+                                title=f"Distribution of {pie_col}",
+                                hole=.3 # Donut chart style
+                            )
+                            st.plotly_chart(fig_pie, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error creating pie chart: {e}")
+                else:
+                    st.info("No categorical columns for a pie chart.")
+
+            st.markdown("---")
+            st.info("To create more custom or advanced dashboards, use the **Business Intelligence** module.")
+
         else:
-            st.warning("⚠️ Please upload data first!")
+            st.warning("⚠️ Please upload and clean data first in the **Data Upload** and **Data Cleaning** modules.")
 
     # MODEL BUILDER PAGE
     elif page == "🤖 Model Builder":
