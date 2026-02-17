@@ -12,3 +12,5 @@ requests
 statsmodels
 joblib
 openpyxl 
+psycopg2-binary
+sqlalchemy
