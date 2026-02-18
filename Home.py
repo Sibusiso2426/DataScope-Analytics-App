@@ -51,7 +51,7 @@ warnings.warn("A date index must be provided for the predict method", UserWarnin
 @st.cache_resource
 def init_ai():
     # Using 'gemini-1.5-flash' which is the stable production model
-    # API_KEY = "AIzaSyBdDzX3fC9w2Hk2wlMB8ko1H8SCx7WnjUc" 
+
     genai.configure(api_key=api_key)
     # Note: 'gemini-3-flash-preview' does not exist in the current API
     return genai.GenerativeModel('gemini-2.5-flash')
@@ -430,7 +430,7 @@ def datascope_app_content():
     """All the content for the DataScope Analytics application"""
     
     # Main title
-    st.markdown('<h1 class="main-header">📊 DataScope Analytics</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">📊 AI-Powered Data Science Platform</h1>', unsafe_allow_html=True)
     st.markdown("### *Comprehensive Data Analytics & Dashboard Builder*")
 
     # Sidebar navigation for the DataScope app modules
@@ -446,7 +446,7 @@ def datascope_app_content():
         
         with col2:
             st.markdown("""
-            ## Welcome to DataScope Analytics! 🎯
+            ## Welcome to AI-Powered Data Science Platform! 🎯
             
             Your all-in-one platform for data analytics, visualization, and machine learning.
             
@@ -2479,3 +2479,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
