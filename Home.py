@@ -700,7 +700,7 @@ def datascope_app_content():
 
 
     # DATA CLEANING PAGE
-    elif page == "🧹 Data Cleaning":
+    elif page == "🧹 Operational Intelligence":
         st.markdown('<h2 class="section-header">🧹 Data Cleaning & Preprocessing</h2>', unsafe_allow_html=True)
         
         if st.session_state.data is not None:
@@ -937,7 +937,7 @@ def datascope_app_content():
             st.warning("Please upload a dataset first to use the AI Copilot.")
 
 # DASHBOARD BUILDER PAGE
-    elif page == "📈 Dashboard Builder":
+    elif page == "📈 Executive Dashboard":
         st.markdown('<h2 class="section-header">📈 Interactive Dashboard Builder</h2>', unsafe_allow_html=True)
         
         if st.session_state.data is not None:
@@ -1206,7 +1206,7 @@ def datascope_app_content():
             st.warning("⚠️ Please upload and clean data first in the **Data Upload** and **Data Cleaning** modules.")
 
     # MODEL BUILDER PAGE
-    elif page == "🤖 Model Builder":
+    elif page == "🤖 Forecasting & Planning":
         st.markdown('<h2 class="section-header">🤖 Machine Learning Model Builder</h2>', unsafe_allow_html=True)
         
         if st.session_state.data is not None:
@@ -1800,7 +1800,7 @@ def datascope_app_content():
 
 
     # ADVANCED ANALYTICS PAGE
-    elif page == "📊 Advanced Analytics":
+    elif page == "📊 Data Governance":
         st.markdown('<h2 class="section-header">📊 Advanced Statistical Analysis</h2>', unsafe_allow_html=True)
         
         if st.session_state.data is not None:
@@ -2229,7 +2229,7 @@ def datascope_app_content():
             st.warning("⚠️ Please upload data first to explore Financial Analytics features!")
 
     # ENHANCED ANALYTICS & VISUALIZATION PAGE
-    elif page == "✨ Enhanced Analytics & Visualization":
+    elif page == "✨ Performance Monitoring":
         st.markdown('<h2 class="section-header">✨ Enhanced Analytics & Visualization</h2>', unsafe_allow_html=True)
 
         if st.session_state.data is not None:
@@ -2479,4 +2479,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
