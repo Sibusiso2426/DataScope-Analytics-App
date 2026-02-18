@@ -437,7 +437,7 @@ def datascope_app_content():
     st.sidebar.title("🚀 Navigation")
     page = st.sidebar.selectbox(
         "Choose a module:",
-        ["🏠 Home", "📤 Data Upload", "🧹 Data Cleaning","🤖 AI Copilot", "📈 Executive Dashboard", "🤖 Forecasting & Planning", "📊 Data Governance", "📈 Business Intelligence", "💰 Financial Analytics", "✨ Performance Monitoring"] # Added Enhanced Analytics
+        ["🏠 Home", "📤 Data Upload", "🧹 Operational Intelligence","🤖 AI Copilot", "📈 Executive Dashboard", "🤖 Forecasting & Planning", "📊 Data Governance", "📈 Business Intelligence", "💰 Financial Analytics", "✨ Performance Monitoring"] # Added Enhanced Analytics
     )
 
     # HOME PAGE
@@ -2479,6 +2479,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
