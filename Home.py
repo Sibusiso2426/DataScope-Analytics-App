@@ -35,10 +35,6 @@ import requests # New import for API calls
 import json # New import for JSON handling
 import google.generativeai as genai
 from dotenv import load_dotenv
-from openai import OpenAI
-
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
 
 load_dotenv()
 
@@ -2483,6 +2479,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
