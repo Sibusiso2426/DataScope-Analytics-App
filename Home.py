@@ -33,6 +33,13 @@ import secrets
 import joblib # New import for saving/loading models
 import requests # New import for API calls
 import json # New import for JSON handling
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
+
+api_key = os.getenv("OPENAI_API_KEY")
+
 
 # New import for Time Series Forecasting
 from statsmodels.tsa.arima.model import ARIMA
@@ -40,10 +47,20 @@ from statsmodels.tsa.arima.model import ARIMA
 warnings.filterwarnings("ignore", message="No supported index is available. Prediction results will be given with default index", category=UserWarning)
 warnings.warn("A date index must be provided for the predict method", UserWarning) # Corrected syntax for warnings.warn
 
+# --- 1. AI CONFIGURATION (Fixed Model Name) ---
+@st.cache_resource
+def init_ai():
+    # Using 'gemini-1.5-flash' which is the stable production model
+    # API_KEY = "AIzaSyBdDzX3fC9w2Hk2wlMB8ko1H8SCx7WnjUc" 
+    genai.configure(api_key=api_key)
+    # Note: 'gemini-3-flash-preview' does not exist in the current API
+    return genai.GenerativeModel('gemini-2.5-flash')
 
-# Ensure the directory for saved models exists
-if not os.path.exists('saved_models'):
-    os.makedirs('saved_models')
+try:
+    ai_model = init_ai()
+except Exception as e:
+    st.error(f"AI Initialization Failed: {e}")
+    ai_model = None
 
 # Database setup
 def init_database():
@@ -409,6 +426,7 @@ def create_kpi_card(label, value, delta=None, delta_color="normal"):
 
 
 def datascope_app_content():
+    global ai_model  # Add this line at the very top of the function
     """All the content for the DataScope Analytics application"""
     
     # Main title
@@ -419,7 +437,7 @@ def datascope_app_content():
     st.sidebar.title("🚀 Navigation")
     page = st.sidebar.selectbox(
         "Choose a module:",
-        ["🏠 Home", "📤 Data Upload", "🧹 Data Cleaning", "📈 Dashboard Builder", "🤖 Model Builder", "📊 Advanced Analytics", "📈 Business Intelligence", "💰 Financial Analytics", "✨ Enhanced Analytics & Visualization"] # Added Enhanced Analytics
+        ["🏠 Home", "📤 Data Upload", "🧹 Data Cleaning","🤖 AI Copilot", "📈 Dashboard Builder", "🤖 Model Builder", "📊 Advanced Analytics", "📈 Business Intelligence", "💰 Financial Analytics", "✨ Enhanced Analytics & Visualization"] # Added Enhanced Analytics
     )
 
     # HOME PAGE
@@ -872,6 +890,51 @@ def datascope_app_content():
         
         else:
             st.warning("⚠️ Please upload data first!")
+
+
+   # AI COPILOT PAGE
+    elif page == "🤖 AI Copilot":
+        st.markdown('<h2 class="section-header">🤖 AI Data Copilot</h2>', unsafe_allow_html=True)
+        
+        if st.session_state.data is not None:
+            df = st.session_state.cleaned_data if st.session_state.cleaned_data is not None else st.session_state.data
+            
+            st.info("💡 Ask me questions like: 'What are the main trends?', 'Give me a summary of the numeric columns', or 'How should I clean this data?'")
+            
+            # Chat History
+            if "messages" not in st.session_state:
+                st.session_state.messages = []
+
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+
+            if prompt := st.chat_input("Analyze my data..."):
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+                with st.chat_message("assistant"):
+                    # Prepare context (Metadata only to stay under token limits)
+                    data_summary = f"""
+                    Dataset Summary:
+                    - Rows: {df.shape[0]}
+                    - Columns: {df.columns.tolist()}
+                    - Missing Values: {df.isnull().sum().sum()}
+                    - Data Types: {df.dtypes.to_dict()}
+                    - Head (first 3 rows): {df.head(3).to_string()}
+                    """
+                    
+                    full_prompt = f"You are a Data Science expert. Context: {data_summary}\n\nUser Question: {prompt}"
+                    
+                    try:
+                        response = ai_model.generate_content(full_prompt)
+                        st.markdown(response.text)
+                        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    except Exception as e:
+                        st.error(f"AI Error: {e}")
+        else:
+            st.warning("Please upload a dataset first to use the AI Copilot.")
 
 # DASHBOARD BUILDER PAGE
     elif page == "📈 Dashboard Builder":
