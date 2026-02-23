@@ -1584,65 +1584,76 @@ def datascope_app_content():
         else:
             st.info("Train a model first to enable saving.")
 
-        # Model Loading
+        # --- Model Loading Section ---
         st.markdown("---")
         st.markdown("### 📂 Load Saved Model")
+        
+        # Safety Check for Directory
+        if not os.path.exists('saved_models'):
+            os.makedirs('saved_models')
+        
         saved_model_files = [f for f in os.listdir('saved_models') if f.endswith('.joblib')]
+        
         if saved_model_files:
             selected_load_model = st.selectbox("Select a model to load:", ["None"] + saved_model_files)
+            
             if selected_load_model != "None" and st.button("Load Model"):
                 try:
                     load_path = os.path.join('saved_models', selected_load_model)
                     model_data = joblib.load(load_path)
                     
+                    # Load into Session State
                     st.session_state.trained_model = model_data['model']
                     st.session_state.model_features = model_data['features']
                     st.session_state.model_target = model_data['target']
                     st.session_state.model_problem_type = model_data['problem_type']
                     st.session_state.model_scaler = model_data['scaler']
                     st.session_state.model_label_encoders = model_data['label_encoders']
-                    st.session_state.model_evaluation_metrics = model_data.get('evaluation_metrics', {}) # Get with default for backward compatibility
-
+                    st.session_state.model_evaluation_metrics = model_data.get('evaluation_metrics', {})
+        
                     st.success(f"Model '{selected_load_model}' loaded successfully!")
-                    st.info(f"Loaded model type: **{type(st.session_state.trained_model).__name__}**")
-                    st.info(f"Target variable: **{st.session_state.model_target}**")
-                    st.info(f"Features used: **{', '.join(st.session_state.model_features)}**")
-
-                    st.markdown("#### Loaded Model Evaluation Metrics (from training time):")
+                    
+                    # Display Basic Info
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.info(f"**Type:** {type(st.session_state.trained_model).__name__}")
+                        st.info(f"**Target:** {st.session_state.model_target}")
+                    with col2:
+                        st.info(f"**Features:** {', '.join(st.session_state.model_features)}")
+        
+                    # --- AI ANALYSIS BLOCK ---
                     metrics = st.session_state.model_evaluation_metrics
                     if metrics:
-                        if st.session_state.model_problem_type == "Regression":
-                            if 'mse' in metrics: st.metric("MSE", f"{metrics['mse']:.2f}")
-                            if 'rmse' in metrics: st.metric("RMSE", f"{metrics['rmse']:.2f}")
-                            if 'r2' in metrics: st.metric("R-squared", f"{metrics['r2']:.2f}")
-                        elif st.session_state.model_problem_type == "Classification":
-                            if 'accuracy' in metrics: st.metric("Accuracy", f"{metrics['accuracy']:.2f}")
-                            if 'classification_report' in metrics:
-                                st.subheader("Classification Report")
-                                # Convert dict report back to string for display if needed, or pretty print
-                                if isinstance(metrics['classification_report'], dict):
-                                    report_str = ""
-                                    for k, v in metrics['classification_report'].items():
-                                        if isinstance(v, dict):
-                                            report_str += f"{k}:\n"
-                                            for sub_k, sub_v in v.items():
-                                                if isinstance(sub_v, float):
-                                                    report_str += f"  {sub_k}: {sub_v:.2f}\n"
-                                                else:
-                                                    report_str += f"  {sub_k}: {sub_v}\n"
-                                        else:
-                                            report_str += f"{k}: {v}\n"
-                                    st.text(report_str)
-                                else:
-                                    st.text(metrics['classification_report'])
-                        elif st.session_state.model_problem_type == "Time Series Forecasting":
-                            st.metric("In-sample RMSE", f"{metrics.get('in_sample_rmse', 0):.2f}")
-                            st.metric("In-sample MAE", f"{metrics.get('in_sample_mae', 0):.2f}")
-                            st.write(f"Forecast Horizon: {metrics.get('forecast_horizon', 'N/A')} steps")
-                            st.write(f"ARIMA Order: {metrics.get('arima_order', 'N/A')}")
+                        st.markdown("#### 📊 Model Performance")
+                        
+                        # Display Metrics (Your existing display logic here)
+                        # ... [Keep your existing metric display code] ...
+        
+                        # NEW: AI Explainer Button
+                        if st.button("🤖 Ask AI to explain these results"):
+                            with st.spinner("AI is analyzing your model performance..."):
+                                analysis_prompt = f"""
+                                Analyze this Machine Learning model performance:
+                                Model Type: {type(st.session_state.trained_model).__name__}
+                                Problem: {st.session_state.model_problem_type}
+                                Target: {st.session_state.model_target}
+                                Metrics: {metrics}
+                                
+                                Explain in 3 bullet points:
+                                1. Is this a good model? 
+                                2. What do these specific numbers mean for a business user?
+                                3. One suggestion to improve it.
+                                """
+                                try:
+                                    # Using the global ai_model we initialized earlier
+                                    response = ai_model.generate_content(analysis_prompt)
+                                    st.markdown("### 🧠 AI Analysis")
+                                    st.write(response.text)
+                                except Exception as e:
+                                    st.error(f"AI could not analyze: {e}")
                     else:
                         st.info("No evaluation metrics saved with this model.")
-
+        
                 except Exception as e:
                     st.error(f"Error loading model: {str(e)}")
         else:
@@ -2479,6 +2490,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
