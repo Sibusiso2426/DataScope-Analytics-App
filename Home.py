@@ -1583,83 +1583,105 @@ def datascope_app_content():
                     st.error(f"Error saving model: {str(e)}")
         else:
             st.info("Train a model first to enable saving.")
-
+            
         # --- Model Loading Section ---
         st.markdown("---")
         st.markdown("### 📂 Load Saved Model")
-        
-        # Safety Check for Directory
-        if not os.path.exists('saved_models'):
-            os.makedirs('saved_models')
-        
-        saved_model_files = [f for f in os.listdir('saved_models') if f.endswith('.joblib')]
-        
+
+        target_dir = 'saved_models'
+
+        # --- THE BRUTE FORCE REPAIR ---
+        try:
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir)
+            saved_model_files = [f for f in os.listdir(target_dir) if f.endswith('.joblib')]
+        except (NotADirectoryError, FileNotFoundError):
+            if os.path.exists(target_dir):
+                os.remove(target_dir) 
+            os.makedirs(target_dir)
+            saved_model_files = []
+        except Exception as e:
+            st.error(f"Unexpected Folder Error: {e}")
+            saved_model_files = []
+
+        # --- UI LOGIC ---
         if saved_model_files:
             selected_load_model = st.selectbox("Select a model to load:", ["None"] + saved_model_files)
             
             if selected_load_model != "None" and st.button("Load Model"):
                 try:
-                    load_path = os.path.join('saved_models', selected_load_model)
+                    load_path = os.path.join(target_dir, selected_load_model)
                     model_data = joblib.load(load_path)
                     
-                    # Load into Session State
-                    st.session_state.trained_model = model_data['model']
-                    st.session_state.model_features = model_data['features']
-                    st.session_state.model_target = model_data['target']
-                    st.session_state.model_problem_type = model_data['problem_type']
-                    st.session_state.model_scaler = model_data['scaler']
-                    st.session_state.model_label_encoders = model_data['label_encoders']
+                    # Map data to session state
+                    st.session_state.trained_model = model_data.get('model')
+                    st.session_state.model_features = model_data.get('features', [])
+                    st.session_state.model_target = model_data.get('target', "Unknown")
+                    st.session_state.model_problem_type = model_data.get('problem_type', "Unknown")
                     st.session_state.model_evaluation_metrics = model_data.get('evaluation_metrics', {})
-        
-                    st.success(f"Model '{selected_load_model}' loaded successfully!")
+
+                    st.success(f"✅ Model '{selected_load_model}' loaded!")
                     
                     # Display Basic Info
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.info(f"**Type:** {type(st.session_state.trained_model).__name__}")
-                        st.info(f"**Target:** {st.session_state.model_target}")
-                    with col2:
-                        st.info(f"**Features:** {', '.join(st.session_state.model_features)}")
-        
+                    st.write(f"**Type:** {type(st.session_state.trained_model).__name__}")
+                    st.write(f"**Features:** {', '.join(st.session_state.model_features)}")
+
                     # --- AI ANALYSIS BLOCK ---
                     metrics = st.session_state.model_evaluation_metrics
                     if metrics:
-                        st.markdown("#### 📊 Model Performance")
+                        st.markdown("---")
+                        st.markdown("### 📊 Model Performance Analysis")
                         
-                        # Display Metrics (Your existing display logic here)
-                        # ... [Keep your existing metric display code] ...
-        
-                        # NEW: AI Explainer Button
-                        if st.button("🤖 Ask AI to explain these results"):
-                            with st.spinner("AI is analyzing your model performance..."):
-                                analysis_prompt = f"""
-                                Analyze this Machine Learning model performance:
-                                Model Type: {type(st.session_state.trained_model).__name__}
-                                Problem: {st.session_state.model_problem_type}
-                                Target: {st.session_state.model_target}
-                                Metrics: {metrics}
-                                
-                                Explain in 3 bullet points:
-                                1. Is this a good model? 
-                                2. What do these specific numbers mean for a business user?
-                                3. One suggestion to improve it.
-                                """
-                                try:
-                                    # Using the global ai_model we initialized earlier
-                                    response = ai_model.generate_content(analysis_prompt)
-                                    st.markdown("### 🧠 AI Analysis")
-                                    st.write(response.text)
-                                except Exception as e:
-                                    st.error(f"AI could not analyze: {e}")
+                        # Visual Dashboard of numbers
+                        m_col1, m_col2 = st.columns(2)
+                        if st.session_state.model_problem_type == "Classification":
+                            with m_col1: st.metric("Accuracy", f"{metrics.get('accuracy', 0):.2%}")
+                            with m_col2: st.metric("Weighted F1", f"{metrics.get('weighted_avg_f1', 0):.2f}")
+                        else:
+                            with m_col1: st.metric("R² Score", f"{metrics.get('r2', 0):.4f}")
+                            with m_col2: st.metric("RMSE", f"{metrics.get('rmse', 0):.2f}")
+
+                        # AI Explainer Button
+                        if st.button("🤖 Generate AI Executive Summary"):
+                            if ai_model:
+                                with st.spinner("Analyzing performance data..."):
+                                    analysis_prompt = f"""
+                                    As a Senior Data Scientist, explain this model's performance to a non-technical manager.
+                                    MODEL: {type(st.session_state.trained_model).__name__}
+                                    TASK: {st.session_state.model_problem_type}
+                                    METRICS: {metrics}
+                                    
+                                    Provide:
+                                    1. Verdict: Is it reliable?
+                                    2. Business Impact: What do these numbers mean for real-world use?
+                                    3. Next Steps: Two ways to improve.
+                                    """
+                                    
+                                    # THE FIX: Added the necessary try/except here
+                                    try:
+                                        response = ai_model.generate_content(analysis_prompt)
+                                        st.markdown("### 🧠 AI Executive Insights")
+                                        st.info(response.text)
+                                        
+                                        st.download_button(
+                                            label="📥 Download AI Report",
+                                            data=response.text,
+                                            file_name=f"AI_Report_{st.session_state.model_target}.txt",
+                                            mime="text/plain"
+                                        )
+                                    except Exception as ai_err:
+                                        st.error(f"AI Generation failed: {ai_err}")
+                            else:
+                                st.warning("AI model not initialized. Check your API key at the top of the script.")
                     else:
-                        st.info("No evaluation metrics saved with this model.")
-        
-                except Exception as e:
-                    st.error(f"Error loading model: {str(e)}")
+                        st.info("No evaluation metrics were saved with this model.")
+                
+                # This except handles the initial file loading 'try'
+                except Exception as load_err:
+                    st.error(f"Error reading model file: {load_err}")
         else:
             st.info("No saved models found. Train and save a model first!")
-
-
+                                    
         # Prediction Interface (remains the same, but now uses loaded model)
         st.markdown("---")
         st.markdown("### 🔮 Make Predictions")
