@@ -35,6 +35,20 @@ import requests # New import for API calls
 import json # New import for JSON handling
 import google.generativeai as genai
 from dotenv import load_dotenv
+import shutil
+
+# --- 2026 DIRECTORY REPAIR BLOCK ---
+target_path = 'saved_models'
+
+if os.path.exists(target_path):
+    if not os.path.isdir(target_path):
+        # If it's a file blocking our way, remove it
+        os.remove(target_path)
+        os.makedirs(target_path)
+        print(f"Fixed: Removed file '{target_path}' and created directory.")
+else:
+    # If nothing exists, create the folder
+    os.makedirs(target_path)
 
 load_dotenv()
 
@@ -1584,31 +1598,40 @@ def datascope_app_content():
         else:
             st.info("Train a model first to enable saving.")
 
-        # --- Model Loading Section ---
+             # --- Model Loading Section ---
         st.markdown("---")
         st.markdown("### 📂 Load Saved Model")
         
-        # Safety Check for Directory
-        if not os.path.exists('saved_models'):
-            os.makedirs('saved_models')
+        target_dir = 'saved_models'
         
-        saved_model_files = [f for f in os.listdir('saved_models') if f.endswith('.joblib')]
+        # 1. FIXED: Robust directory handling to prevent NotADirectoryError
+        if os.path.exists(target_dir):
+            if not os.path.isdir(target_dir):
+                # If it exists but is a file, remove it and create a proper folder
+                os.remove(target_dir)
+                os.makedirs(target_dir)
+        else:
+            # If it doesn't exist at all, create it
+            os.makedirs(target_dir)
+        
+        # 2. Get list of files safely
+        saved_model_files = [f for f in os.listdir(target_dir) if f.endswith('.joblib')]
         
         if saved_model_files:
             selected_load_model = st.selectbox("Select a model to load:", ["None"] + saved_model_files)
             
             if selected_load_model != "None" and st.button("Load Model"):
                 try:
-                    load_path = os.path.join('saved_models', selected_load_model)
+                    load_path = os.path.join(target_dir, selected_load_model)
                     model_data = joblib.load(load_path)
                     
-                    # Load into Session State
-                    st.session_state.trained_model = model_data['model']
-                    st.session_state.model_features = model_data['features']
-                    st.session_state.model_target = model_data['target']
-                    st.session_state.model_problem_type = model_data['problem_type']
-                    st.session_state.model_scaler = model_data['scaler']
-                    st.session_state.model_label_encoders = model_data['label_encoders']
+                    # Populate Session State
+                    st.session_state.trained_model = model_data.get('model')
+                    st.session_state.model_features = model_data.get('features', [])
+                    st.session_state.model_target = model_data.get('target', "Unknown")
+                    st.session_state.model_problem_type = model_data.get('problem_type', "Unknown")
+                    st.session_state.model_scaler = model_data.get('scaler')
+                    st.session_state.model_label_encoders = model_data.get('label_encoders', {})
                     st.session_state.model_evaluation_metrics = model_data.get('evaluation_metrics', {})
         
                     st.success(f"Model '{selected_load_model}' loaded successfully!")
@@ -1626,31 +1649,36 @@ def datascope_app_content():
                     if metrics:
                         st.markdown("#### 📊 Model Performance")
                         
-                        # Display Metrics (Your existing display logic here)
-                        # ... [Keep your existing metric display code] ...
+                        # Metric display logic (Summary table or metrics)
+                        if st.session_state.model_problem_type == "Classification":
+                            st.write(f"Accuracy: {metrics.get('accuracy', 0):.2%}")
+                        else:
+                            st.write(f"R² Score: {metrics.get('r2', 0):.4f}")
         
-                        # NEW: AI Explainer Button
+                        # AI Explainer
                         if st.button("🤖 Ask AI to explain these results"):
-                            with st.spinner("AI is analyzing your model performance..."):
-                                analysis_prompt = f"""
-                                Analyze this Machine Learning model performance:
-                                Model Type: {type(st.session_state.trained_model).__name__}
-                                Problem: {st.session_state.model_problem_type}
-                                Target: {st.session_state.model_target}
-                                Metrics: {metrics}
-                                
-                                Explain in 3 bullet points:
-                                1. Is this a good model? 
-                                2. What do these specific numbers mean for a business user?
-                                3. One suggestion to improve it.
-                                """
-                                try:
-                                    # Using the global ai_model we initialized earlier
-                                    response = ai_model.generate_content(analysis_prompt)
-                                    st.markdown("### 🧠 AI Analysis")
-                                    st.write(response.text)
-                                except Exception as e:
-                                    st.error(f"AI could not analyze: {e}")
+                            if ai_model: # Ensure the global ai_model exists
+                                with st.spinner("AI is analyzing your model performance..."):
+                                    analysis_prompt = f"""
+                                    Analyze this Machine Learning model performance:
+                                    Model Type: {type(st.session_state.trained_model).__name__}
+                                    Problem: {st.session_state.model_problem_type}
+                                    Target: {st.session_state.model_target}
+                                    Metrics: {metrics}
+                                    
+                                    Explain in 3 bullet points:
+                                    1. Is this a good model based on these numbers? 
+                                    2. What do these metrics mean for a business user?
+                                    3. One practical suggestion to improve this specific model.
+                                    """
+                                    try:
+                                        response = ai_model.generate_content(analysis_prompt)
+                                        st.markdown("### 🧠 AI Analysis")
+                                        st.success(response.text)
+                                    except Exception as e:
+                                        st.error(f"AI could not analyze: {e}")
+                            else:
+                                st.warning("AI Model not initialized. Check your API key at the top of the script.")
                     else:
                         st.info("No evaluation metrics saved with this model.")
         
@@ -1658,8 +1686,6 @@ def datascope_app_content():
                     st.error(f"Error loading model: {str(e)}")
         else:
             st.info("No saved models found. Train and save a model first!")
-
-
         # Prediction Interface (remains the same, but now uses loaded model)
         st.markdown("---")
         st.markdown("### 🔮 Make Predictions")
@@ -2490,6 +2516,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
